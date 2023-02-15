@@ -1,2 +1,2 @@
-window.nearApi = require('./lib/browser-index');
-window.Buffer = Buffer;
+globalThis.nearApi = require('./lib/browser-index');
+globalThis.Buffer = Buffer;

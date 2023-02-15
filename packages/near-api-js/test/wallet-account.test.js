@@ -7,7 +7,7 @@ const MULTISIG_HAS_METHOD = 'add_request_and_confirm';
 
 let lastRedirectUrl;
 let lastTransaction;
-global.window = {
+global.globalThis = {
     localStorage
 };
 global.document = {
@@ -39,7 +39,7 @@ beforeEach(() => {
     };
     lastRedirectUrl = null;
     history = [];
-    Object.assign(global.window, {
+    Object.assign(global.globalThis, {
         location: {
             href: 'http://example.com/location',
             assign(url) {
@@ -64,16 +64,16 @@ it('throws if non string appKeyPrefix', () => {
     expect(() => new nearApi.WalletConnection(nearFake, undefined)).toThrow(/appKeyPrefix/);
 });
 
-describe('fails gracefully on the server side (without window)', () => {
-    const windowValueBefore = global.window;
+describe('fails gracefully on the server side (without globalThis)', () => {
+    const globalThisValueBefore = global.globalThis;
 
     beforeEach(() => {
-        global.window = undefined;
+        global.globalThis = undefined;
         keyStore.clear();
     });
 
     afterEach(() => {
-        global.window = windowValueBefore;
+        global.globalThis = globalThisValueBefore;
     });
 
     it('does not throw on instantiation', () => {
@@ -162,7 +162,7 @@ it('can request sign in with methodNames', async () => {
 
 it('can complete sign in', async () => {
     const keyPair = nearApi.KeyPair.fromRandom('ed25519');
-    global.window.location.href = `http://example.com/location?account_id=near.account&public_key=${keyPair.publicKey}`;
+    global.globalThis.location.href = `http://example.com/location?account_id=near.account&public_key=${keyPair.publicKey}`;
     await keyStore.setKey('networkId', 'pending_key' + keyPair.publicKey, keyPair);
 
     await walletConnection._completeSignInWithAccessKey();
@@ -176,7 +176,7 @@ it('can complete sign in', async () => {
 
 it('Promise until complete sign in', async () => {
     const keyPair = nearApi.KeyPair.fromRandom('ed25519');
-    global.window.location.href = `http://example.com/location?account_id=near2.account&public_key=${keyPair.publicKey}`;
+    global.globalThis.location.href = `http://example.com/location?account_id=near2.account&public_key=${keyPair.publicKey}`;
     await keyStore.setKey('networkId', 'pending_key' + keyPair.publicKey, keyPair);
 
     const newWalletConn = new nearApi.WalletConnection(nearFake, 'promise_on_complete_signin');

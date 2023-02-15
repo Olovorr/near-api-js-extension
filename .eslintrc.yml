@@ -20,7 +20,7 @@ rules:
     - always
   no-console: off
 globals:
-  window: true
+  globalThis: true
   fetch: true
   Headers: true
   document: true

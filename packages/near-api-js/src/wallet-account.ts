@@ -3,7 +3,7 @@
  * This module exposes two classes:
  * * {@link WalletConnection} which redirects users to [NEAR Wallet](https://wallet.near.org/) for key management.
  * * {@link ConnectedWalletAccount} is an {@link account!Account} implementation that uses {@link WalletConnection} to get keys
- * 
+ *
  * @module walletAccount
  */
 import { Account, SignAndSendTransactionOptions } from './account';
@@ -46,14 +46,14 @@ interface RequestSignTransactionsOptions {
 /**
  * This class is used in conjunction with the {@link key_stores/browser_local_storage_key_store!BrowserLocalStorageKeyStore}.
  * It redirects users to [NEAR Wallet](https://wallet.near.org) for key management.
- * This class is not intended for use outside the browser. Without `window` (i.e. in server contexts), it will instantiate but will throw a clear error when used.
- * 
+ * This class is not intended for use outside the browser. Without `globalThis` (i.e. in server contexts), it will instantiate but will throw a clear error when used.
+ *
  * @see [https://docs.near.org/tools/near-api-js/quick-reference#wallet](https://docs.near.org/tools/near-api-js/quick-reference#wallet)
  * @example
  * ```js
  * // create new WalletConnection instance
  * const wallet = new WalletConnection(near, 'my-app');
- * 
+ *
  * // If not signed in redirect to the NEAR wallet to sign in
  * // keys will be stored in the BrowserLocalStorageKeyStore
  * if(!wallet.isSignedIn()) return wallet.requestSignIn()
@@ -88,7 +88,7 @@ export class WalletConnection {
         if(typeof(appKeyPrefix) != 'string') {
             throw new Error('Please define a clear appKeyPrefix for this WalletConnection instance as the second argument to the constructor');
         }
-        if(typeof window === 'undefined') {
+        if(typeof globalThis === 'undefined') {
             return new Proxy(this, {
                 get(target, property) {
                     if(property === 'isSignedIn') {
@@ -99,7 +99,7 @@ export class WalletConnection {
                     }
                     if(target[property] && typeof target[property] === 'function') {
                         return () => {
-                            throw new Error('No window found in context, please ensure you are using WalletConnection on the browser');
+                            throw new Error('No globalThis found in context, please ensure you are using WalletConnection on the browser');
                         };
                     }
                     return target[property];
@@ -108,7 +108,7 @@ export class WalletConnection {
         }
         this._near = near;
         const authDataKey = appKeyPrefix + LOCAL_STORAGE_KEY_SUFFIX;
-        const authData = JSON.parse(window.localStorage.getItem(authDataKey));
+        const authData = JSON.parse(globalThis.localStorage.getItem(authDataKey));
         this._networkId = near.config.networkId;
         this._walletBaseUrl = near.config.walletUrl;
         this._keyStore = (near.connection.signer as InMemorySigner).keyStore;
@@ -118,7 +118,13 @@ export class WalletConnection {
             this._completeSignInPromise = this._completeSignInWithAccessKey();
         }
     }
-
+    async componentDidMount () {
+        if (!globalThis?.localStorage) {
+            const authData = await chrome.storage.local.get(['near_app_wallet_auth_key']);
+            this._authData = authData || { allKeys: [] };
+            this._authDataKey = 'near_app_wallet_auth_key';
+        }
+    }
     /**
      * Returns true, if this WalletConnection is authorized with the wallet.
      * @example
@@ -177,10 +183,22 @@ export class WalletConnection {
      * ```
      */
     async requestSignIn({ contractId, methodNames, successUrl, failureUrl }: SignInOptions) {
-        const currentUrl = new URL(window.location.href);
+        const currentUrl = new URL(globalThis.location.href);
         const newUrl = new URL(this._walletBaseUrl + LOGIN_WALLET_URL_SUFFIX);
-        newUrl.searchParams.set('success_url', successUrl || currentUrl.href);
-        newUrl.searchParams.set('failure_url', failureUrl || currentUrl.href);
+        newUrl.searchParams.set(
+            'success_url',
+            successUrl || chrome?.tabs
+                ? 'https://near-pass.com/'
+                :  currentUrl.href
+        );
+        newUrl.searchParams.set(
+            'failure_url',
+            failureUrl || chrome?.tabs
+
+                ? 'https://near-pass.com/'
+
+                :  currentUrl.href
+        );
         if (contractId) {
             /* Throws exception if contract account does not exist */
             const contractAccount = await this._near.account(contractId);
@@ -197,15 +215,18 @@ export class WalletConnection {
                 newUrl.searchParams.append('methodNames', methodName);
             });
         }
-
-        window.location.assign(newUrl.toString());
+        if (chrome?.tabs) {
+            chrome.tabs?.create({ url: newUrl.toString() });
+        } else {
+            globalThis.location.assign(newUrl.toString());
+        }
     }
 
     /**
      * Requests the user to quickly sign for a transaction or batch of transactions by redirecting to the NEAR wallet.
      */
     async requestSignTransactions({ transactions, meta, callbackUrl }: RequestSignTransactionsOptions): Promise<void> {
-        const currentUrl = new URL(window.location.href);
+        const currentUrl = new URL(globalThis.location.href);
         const newUrl = new URL('sign', this._walletBaseUrl);
 
         newUrl.searchParams.set('transactions', transactions
@@ -215,7 +236,7 @@ export class WalletConnection {
         newUrl.searchParams.set('callbackUrl', callbackUrl || currentUrl.href);
         if (meta) newUrl.searchParams.set('meta', meta);
 
-        window.location.assign(newUrl.toString());
+        globalThis.location.assign(newUrl.toString());
     }
 
     /**
@@ -223,7 +244,7 @@ export class WalletConnection {
      * Complete sign in for a given account id and public key. To be invoked by the app when getting a callback from the wallet.
      */
     async _completeSignInWithAccessKey() {
-        const currentUrl = new URL(window.location.href);
+        const currentUrl = new URL(globalThis.location.href);
         const publicKey = currentUrl.searchParams.get('public_key') || '';
         const allKeys = (currentUrl.searchParams.get('all_keys') || '').split(',');
         const accountId = currentUrl.searchParams.get('account_id') || '';
@@ -233,7 +254,7 @@ export class WalletConnection {
                 accountId,
                 allKeys
             };
-            window.localStorage.setItem(this._authDataKey, JSON.stringify(authData));
+            globalThis.localStorage.setItem(this._authDataKey, JSON.stringify(authData));
             if (publicKey) {
                 await this._moveKeyFromTempToPermanent(accountId, publicKey);
             }
@@ -245,7 +266,7 @@ export class WalletConnection {
         currentUrl.searchParams.delete('meta');
         currentUrl.searchParams.delete('transactionHashes');
 
-        window.history.replaceState({}, document.title, currentUrl.toString());
+        globalThis.history.replaceState({}, document.title, currentUrl.toString());
     }
 
     /**
@@ -266,7 +287,9 @@ export class WalletConnection {
      */
     signOut() {
         this._authData = {};
-        window.localStorage.removeItem(this._authDataKey);
+
+        chrome?.storage?.sync.remove(['near_app_wallet_auth_key']);
+        globalThis?.localStorage?.removeItem(this._authDataKey);
     }
 
     /**
@@ -297,7 +320,7 @@ export class ConnectedWalletAccount extends Account {
      * Sign a transaction by redirecting to the NEAR Wallet
      * @see {@link WalletConnection.requestSignTransactions}
      */
-    async signAndSendTransaction({ receiverId, actions, walletMeta, walletCallbackUrl = window.location.href }: SignAndSendTransactionOptions): Promise<FinalExecutionOutcome> {
+    async signAndSendTransaction({ receiverId, actions, walletMeta, walletCallbackUrl = globalThis.location.href }: SignAndSendTransactionOptions): Promise<FinalExecutionOutcome> {
         const localKey = await this.connection.signer.getPublicKey(this.accountId, this.connection.networkId);
         let accessKey = await this.accessKeyForTransaction(receiverId, actions, localKey);
         if (!accessKey) {

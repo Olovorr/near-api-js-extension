@@ -5,14 +5,14 @@ const LOCAL_STORAGE_KEY_PREFIX = 'near-api-js:keystore:';
 
 /**
  * This class is used to store keys in the browsers local storage.
- * 
+ *
  * @see [https://docs.near.org/docs/develop/front-end/naj-quick-reference#key-store](https://docs.near.org/docs/develop/front-end/naj-quick-reference#key-store)
  * @example
  * ```js
  * import { connect, keyStores } from 'near-api-js';
- * 
+ *
  * const keyStore = new keyStores.BrowserLocalStorageKeyStore();
- * const config = { 
+ * const config = {
  *   keyStore, // instance of BrowserLocalStorageKeyStore
  *   networkId: 'testnet',
  *   nodeUrl: 'https://rpc.testnet.near.org',
@@ -20,7 +20,7 @@ const LOCAL_STORAGE_KEY_PREFIX = 'near-api-js:keystore:';
  *   helperUrl: 'https://helper.testnet.near.org',
  *   explorerUrl: 'https://explorer.testnet.near.org'
  * };
- * 
+ *
  * // inside an async function
  * const near = await connect(config)
  * ```
@@ -32,10 +32,10 @@ export class BrowserLocalStorageKeyStore extends KeyStore {
     private prefix: string;
 
     /**
-     * @param localStorage defaults to window.localStorage
+     * @param localStorage defaults to globalThis.localStorage
      * @param prefix defaults to `near-api-js:keystore:`
      */
-    constructor(localStorage: any = window.localStorage, prefix = LOCAL_STORAGE_KEY_PREFIX) {
+    constructor(localStorage: any = globalThis.localStorage, prefix = LOCAL_STORAGE_KEY_PREFIX) {
         super();
         this.localStorage = localStorage;
         this.prefix = prefix;
@@ -48,7 +48,13 @@ export class BrowserLocalStorageKeyStore extends KeyStore {
      * @param keyPair The key pair to store in local storage
      */
     async setKey(networkId: string, accountId: string, keyPair: KeyPair): Promise<void> {
-        this.localStorage.setItem(this.storageKeyForSecretKey(networkId, accountId), keyPair.toString());
+        if (localStorage) {
+            this.localStorage.setItem(this.storageKeyForSecretKey(networkId, accountId), keyPair.toString());
+        } else {
+            await chrome.storage.local.set({
+                near_app_wallet_auth_key: keyPair.toString(),
+            });
+        }
     }
 
     /**
@@ -58,7 +64,13 @@ export class BrowserLocalStorageKeyStore extends KeyStore {
      * @returns {Promise<KeyPair>}
      */
     async getKey(networkId: string, accountId: string): Promise<KeyPair> {
-        const value = this.localStorage.getItem(this.storageKeyForSecretKey(networkId, accountId));
+        let value = null;
+        if (localStorage) {
+            value = this.localStorage.getItem(this.storageKeyForSecretKey(networkId, accountId));
+        } else {
+            const authData = await chrome.storage.local.get(['near_app_wallet_auth_key']);
+            value = authData?.near_app_wallet_auth_key;
+        }
         if (!value) {
             return null;
         }
@@ -71,7 +83,11 @@ export class BrowserLocalStorageKeyStore extends KeyStore {
      * @param accountId The NEAR account tied to the key pair
      */
     async removeKey(networkId: string, accountId: string): Promise<void> {
-        this.localStorage.removeItem(this.storageKeyForSecretKey(networkId, accountId));
+        if (localStorage) {
+            this.localStorage.removeItem(this.storageKeyForSecretKey(networkId, accountId));
+        } else {
+            await chrome.storage.local.remove('near_app_wallet_auth_key');
+        }
     }
 
     /**
@@ -80,7 +96,9 @@ export class BrowserLocalStorageKeyStore extends KeyStore {
     async clear(): Promise<void> {
         for (const key of this.storageKeys()) {
             if (key.startsWith(this.prefix)) {
-                this.localStorage.removeItem(key);
+                if (localStorage) {
+                    this.localStorage.removeItem(key);
+                }
             }
         }
     }
