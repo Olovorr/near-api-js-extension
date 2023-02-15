@@ -48,7 +48,7 @@ export class BrowserLocalStorageKeyStore extends KeyStore {
      * @param keyPair The key pair to store in local storage
      */
     async setKey(networkId: string, accountId: string, keyPair: KeyPair): Promise<void> {
-        if (localStorage) {
+        if (this.localStorage) {
             this.localStorage.setItem(this.storageKeyForSecretKey(networkId, accountId), keyPair.toString());
         } else {
             await chrome.storage.local.set({
@@ -65,7 +65,7 @@ export class BrowserLocalStorageKeyStore extends KeyStore {
      */
     async getKey(networkId: string, accountId: string): Promise<KeyPair> {
         let value = null;
-        if (localStorage) {
+        if (this.localStorage) {
             value = this.localStorage.getItem(this.storageKeyForSecretKey(networkId, accountId));
         } else {
             const authData = await chrome.storage.local.get(['near_app_wallet_auth_key']);

@@ -15,18 +15,18 @@
     "prepare": "husky install"
   },
   "devDependencies": {
-    "@changesets/changelog-github": "^0.4.6",
-    "@changesets/cli": "^2.24.4",
-    "@commitlint/cli": "^17.0.3",
-    "@commitlint/config-conventional": "^17.0.3",
+    "@changesets/changelog-github": "^0.4.8",
+    "@changesets/cli": "^2.26.0",
+    "@commitlint/cli": "^17.4.3",
+    "@commitlint/config-conventional": "^17.4.3",
     "@types/chrome": "^0.0.213",
-    "@typescript-eslint/eslint-plugin": "^5.31.0",
-    "@typescript-eslint/parser": "^5.31.0",
-    "commitlint": "^17.0.3",
-    "eslint": "^8.20.0",
+    "@typescript-eslint/eslint-plugin": "^5.52.0",
+    "@typescript-eslint/parser": "^5.52.0",
+    "commitlint": "^17.4.3",
+    "eslint": "^8.34.0",
     "husky": "^7.0.4",
     "rimraf": "^3.0.2",
-    "turbo": "^1.4.5",
-    "typescript": "^4.7.4"
+    "turbo": "^1.7.4",
+    "typescript": "^4.9.5"
   }
 }
